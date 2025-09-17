@@ -1,79 +1,12 @@
 WHITE = {'r': 255, 'g': 255, 'b': 255}
 RED = {'r': 255, 'g': 0, 'b': 0}
 GREEN = {'r': 0, 'g': 255, 'b': 0}
-BLUE = {'r': 0, 'g': 0, 'b': 255}
+BLUE = {'r': 50, 'g': 50, 'b': 255}
 BLACK = {'r': 0, 'g': 0, 'b': 0}
 TEAL = {'r': 80, 'g': 255, 'b': 125}
+PINK = {'r': 250, 'g': 50, 'b': 50}
 
-initial_direction = 0
-
-def is_in_deadband(value, min_value, max_value, band_width_pct=10):
-    '''
-    Helper to figure out if a value is approximately a the center of a range.
-    TODO: check negative values
-    TODO: allow specifying band anywhere in the range
-    '''
-    total_range = abs(max_value - min_value)
-    band_width = total_range * band_width_pct / 100
-    center = min_value + total_range/2
-    return value >= center - band_width / 2 and value <= center + band_width / 2
-
-
-async def on_collision():
-    await Sound.Effects.RecordScratch.play(False)
-    await free_self(initial_direction)
-    set_speed(-100)
-    await delay(0.5)
-    set_speed(0)
-    play_matrix_animation(0, False)
-    await shake()
-
-
-async def free_self(start_heading = 0):
-    speed = 100
-    is_free = False
-    while True:
-        # rotate through intervals of 10 degrees, moving backwards at each angle. 
-        # We declare freedom when the robot is level again.
-        # TODO: include distance moved too.
-        start_time = get_elapsed_time()
-        for i in range(start_heading, start_heading + 360, 10):
-            start_distance = get_distance()
-            set_heading(i)
-            set_speed(-speed)
-            await delay(0.5)
-            set_speed(0)
-            await delay(1)
-            if is_in_deadband(get_orientation()['roll'], -180, 180) and \
-                is_in_deadband(get_orientation()['pitch'], -180, 180):
-                is_free = True
-                break
-        if is_free:
-            break
-
-        if get_elapsed_time() - start_time > 5:
-            # Don't try for too long. Declare failure after a few seconds
-            # and ask for help.
-            await speak("Halp!", False)
-    set_speed(0)
-
-
-async def shake():
-    value = 130
-    parity = 1
-    await set_speed(0)
-    for _i in range (9):
-        await spin(value * parity, 0.05)
-        value *= 0.75
-        parity *= -1
-        await delay(0.05)
-
-async def explore():
-    pass
-
-
-register_event(EventType.ON_COLLISION, on_collision)
-register_matrix_animation({'frames': [[[1, 1, 1, 1, 1, 1, 1, 1],
+ANIMATION_CONFUSED = {'frames': [[[1, 1, 1, 1, 1, 1, 1, 1],
         [1, 1, 1, 1, 1, 1, 1, 1],
         [1, 1, 1, 1, 1, 1, 1, 1],
         [1, 1, 1, 1, 1, 1, 1, 1],
@@ -231,14 +164,123 @@ register_matrix_animation({'frames': [[[1, 1, 1, 1, 1, 1, 1, 1],
     {'r': 145, 'g': 0, 'b': 211},
     {'r': 157, 'g': 48, 'b': 118},
     {'r': 255, 'g': 0, 'b': 255},
-    {'r': 204, 'g': 27, 'b': 126}], 'fps': 20, 'transition': MatrixAnimationTransition.FADE})
+    {'r': 204, 'g': 27, 'b': 126}], 'fps': 20, 'transition': MatrixAnimationTransition.FADE}
+
+
+ANIMATION_WAVE = {
+    frames: [[[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [1, 5, 5, 1, 1, 1, 1, 1], [5, 5, 5, 5, 1, 1, 1, 1], [5, 5, 5, 5, 5, 1, 1, 1], [1, 5, 5, 5, 5, 1, 1, 1], [1, 1, 5, 5, 5, 1, 1, 1], [1, 5, 5, 5, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 5, 5, 1], [1, 1, 1, 1, 5, 5, 5, 5], [1, 1, 1, 5, 5, 5, 5, 5], [1, 1, 1, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 5, 5, 5, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [1, 5, 5, 1, 1, 1, 1, 1], [5, 5, 5, 5, 1, 1, 1, 1], [5, 5, 5, 5, 5, 1, 1, 1], [1, 5, 5, 5, 5, 1, 1, 1], [1, 1, 5, 5, 5, 1, 1, 1], [1, 5, 5, 5, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 5, 5, 1], [1, 1, 1, 1, 5, 5, 5, 5], [1, 1, 1, 5, 5, 5, 5, 5], [1, 1, 1, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 5, 5, 5, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [1, 5, 5, 1, 1, 1, 1, 1], [5, 5, 5, 5, 1, 1, 1, 1], [5, 5, 5, 5, 5, 1, 1, 1], [1, 5, 5, 5, 5, 1, 1, 1], [1, 1, 5, 5, 5, 1, 1, 1], [1, 5, 5, 5, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 5, 5, 1], [1, 1, 1, 1, 5, 5, 5, 5], [1, 1, 1, 5, 5, 5, 5, 5], [1, 1, 1, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 5, 5, 5, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [1, 5, 5, 1, 1, 1, 1, 1], [5, 5, 5, 5, 1, 1, 1, 1], [5, 5, 5, 5, 5, 1, 1, 1], [1, 5, 5, 5, 5, 1, 1, 1], [1, 1, 5, 5, 5, 1, 1, 1], [1, 5, 5, 5, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 5, 5, 1], [1, 1, 1, 1, 5, 5, 5, 5], [1, 1, 1, 5, 5, 5, 5, 5], [1, 1, 1, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 5, 5, 5, 1]], [[1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 5, 5, 5, 5, 1], [1, 5, 1, 5, 5, 5, 5, 1], [1, 1, 5, 5, 5, 5, 5, 1], [1, 1, 1, 5, 5, 5, 1, 1], [1, 1, 1, 1, 1, 1, 1, 1]]],
+    palette: [{ r: 255, g: 255, b: 255 }, { r: 0, g: 0, b: 0 }, { r: 255, g: 0, b: 0 }, { r: 255, g: 64, b: 0 }, { r: 255, g: 128, b: 0 }, { r: 255, g: 191, b: 0 }, { r: 255, g: 255, b: 0 }, { r: 185, g: 246, b: 30 }, { r: 0, g: 255, b: 0 }, { r: 185, g: 255, b: 255 }, { r: 0, g: 255, b: 255 }, { r: 0, g: 0, b: 255 }, { r: 145, g: 0, b: 211 }, { r: 157, g: 48, b: 118 }, { r: 255, g: 0, b: 255 }, { r: 204, g: 27, b: 126 }],
+    fps: 8,
+    transition: MatrixAnimationTransition.Fade
+    }
+
+
+ANIMATION_CONFUSED_INDEX = 0
+ANIMATION_WAVE_INDEX = 1
+
+initial_direction = 110
+has_crashed = False
+
+def is_in_deadband(value, min_value, max_value, band_width_pct=10):
+    '''
+    Helper to figure out if a value is approximately a the center of a range.
+    TODO: check negative values
+    TODO: allow specifying band anywhere in the range
+    '''
+    total_range = abs(max_value - min_value)
+    band_width = total_range * band_width_pct / 100
+    center = min_value + total_range/2
+    return value >= center - band_width / 2 and value <= center + band_width / 2
+
+
+async def on_collision():
+    await Sound.Effects.RecordScratch.play(False)
+    has_crashed = True
+    await free_self(initial_direction)
+    set_speed(-100)
+    await delay(0.5)
+    set_speed(0)
+    play_matrix_animation(ANIMATION_CONFUSED_INDEX, False)
+    await delay(len(ANIMATION_CONFUSED['frames']) / ANIMATION_CONFUSED['fps'] + 0.5)
+    await shake()
+    clear_matrix()
+
+
+async def free_self(start_heading = 0):
+    speed = 100
+    is_free = False
+    while True:
+        # rotate through intervals of 10 degrees, moving backwards at each angle. 
+        # We declare freedom when the robot is level again.
+        # TODO: include distance moved too.
+        start_time = get_elapsed_time()
+        for i in range(start_heading, start_heading + 360, 10):
+            start_distance = get_distance()
+            set_heading(i)
+            set_speed(-speed)
+            await delay(0.5)
+            set_speed(0)
+            await delay(1)
+            if is_in_deadband(get_orientation()['roll'], -180, 180) and \
+                is_in_deadband(get_orientation()['pitch'], -180, 180):
+                is_free = True
+                break
+        if is_free:
+            break
+
+        if get_elapsed_time() - start_time > 5:
+            # Don't try for too long. Declare failure after a few seconds
+            # and ask for help.
+            await speak("Halp!", False)
+    set_speed(0)
+
+
+async def shake():
+    value = 130
+    parity = 1
+    await set_speed(0)
+    for _i in range (7):
+        await spin(value * parity, 0.07)
+        value *= 0.9
+        parity *= -1
+        await delay(0.1)
+    await delay(0.5)
+
+
+async def short_delay():
+    await delay(0.2)
+
+
+register_event(EventType.ON_COLLISION, on_collision)
+register_matrix_animation(ANIMATION_CONFUSED)
+registerMatrixAnimation(ANIMATION_WAVE);
 
 async def start_program():
-    await calibrate_compass()
-    set_heading(-60)
-    initial_direction = get_compass_direction()
-    set_front_led(TEAL)
-    set_speed(255)
+    setMatrixRotation(180)
+    set_front_led(BLUE)
+    await roll(initial_direction, 100, 1.25)
+    await delay(0.5)
+    set_heading(initial_direction + 90)
+    await delay(0.5)
+    await play_matrix_animation(ANIMATION_WAVE_INDEX, False)
+    await delay(len(ANIMATION_WAVE['frames']) / ANIMATION_WAVE['fps']) # gross - use FPS to determine when the animation is done
+    await short_delay()
+    clear_matrix()
+    await short_delay()
+    await Sound.Game.LevelUp.play(False)
+    await scroll_matrix_text("I'm Boba!", TEAL, 15, True)
+    await short_delay()
+    set_heading(initial_direction)
+    await short_delay()
+    set_speed(150) # Expect to crash into something here
+    while not has_crashed:
+        await delay(0.5)
+    
+    set_front_led(PINK)
+    set_heading(initial_direction + 180)
+    await short_delay()
+    await roll(initial_direction + 180, 50, 10)
+
   
     
 
