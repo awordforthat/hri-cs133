@@ -1,0 +1,5 @@
+There are a couple of behaviors that I attempted here. The first thing that happens is that the robot rolls onto the "stage", faces the audience, and announces itself (scrolling text and audio). I also added some collision behavior where the matrix displays a "confusion" animation, then the robot shakes itself off and leaves back the way it came, slightly embarrassed.
+
+There's also a "free self" behavior that I didn't show in the video because it doesn't contribute to the robot's "personality". It's meant to let the robot self-rescue if it gets stuck against an obstacle. It works but really could be improved.
+
+I didn't use any AI help for this project.
