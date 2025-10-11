@@ -1,0 +1,4 @@
+spherov2
+speech_recognition
+bleak
+pyaudio

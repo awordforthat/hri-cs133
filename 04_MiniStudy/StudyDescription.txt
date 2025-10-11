@@ -1,0 +1,15 @@
+This study attempts to address the question, "Does the time between acknowledgement of a request and following the request influence perceptions of robot agency?"
+
+The study setup is as follows:
+- The robot is programmed to follow a pseudo-random path at the start of the experiment.
+- The robot is prompted via voice to follow 4 commands: "lights on", "lights off", "stop", and "free".
+- In both conditions, the robot signals acknowledgement by pausing in its path and spinning to face the requester (in this case, the camera).
+- In both conditions, the request is followed when the robot lights blink green, and the robot obeys the request.
+- In the first condition, the robot follows the request 1 second after acknowledging it.
+- In the second condition, the robot follows the request 3 seconds after acknowledging it.
+
+The study is available here: https://tufts.qualtrics.com/jfe/form/SV_5j5lrWLrnCBVpxs
+
+I absolutely used AI to help me write this: 
+1. To help set up the code that both listens for microphone input and sends async commands to the robot. I love Python, but its handling of async code is really rough.
+2. To help me compress the videos enough to comply with Qualtrics' restrictions.
