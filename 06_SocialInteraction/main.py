@@ -1,9 +1,9 @@
+import asyncio
 import cv2
 import functools
-import numpy
+import random
 
-# from deepface import DeepFace
-import asyncio
+from deepface import DeepFace
 import speech_recognition as sr
 from spherov2 import scanner
 from spherov2 import toy
@@ -11,66 +11,72 @@ from spherov2.sphero_edu import SpheroEduAPI
 from spherov2.types import Color
 from spherov2 import utils
 
+from animations import ANIMATIONS, get_animation_index
+
+
 GREEN = Color(20, 250, 25)
 BLACK = Color(0, 0, 0)
+MAX_EMOTION_BUFFER_LENGTH = 10
 
 initialized = False
+last_command = None
+emotion_buffer = []
 
 
-async def fist_bump(sphero):
-    print("in fist bump routine")
-    duration = 0.3
-    sphero.play_matrix_animation(0, False)
-    sphero.roll(0, 50, duration)
-    await asyncio.sleep(duration)
-    sphero.roll(180, -50, duration)
-    await asyncio.sleep(duration)
-    sphero.set_heading(0)
+def update_emotion_buffer(new_emotion):
+    # lazy ring buffer
+    global emotion_buffer
+    emotion_buffer.append(new_emotion)
+    if len(emotion_buffer) > MAX_EMOTION_BUFFER_LENGTH:
+        emotion_buffer = emotion_buffer[1:]
+
+
+def get_primary_emotion():
+    return max(emotion_buffer, key=emotion_buffer.count)
+
+
+async def fist_bump(sphero, heading=0, do_well=True):
+    if do_well:
+        duration = 0.3
+        sphero.play_matrix_animation(get_animation_index("fist_bump"), False)
+        sphero.roll(heading, 50, duration)
+        await asyncio.sleep(duration)
+        sphero.roll((heading + 180) % 360, -50, duration)
+        await asyncio.sleep(duration)
+        sphero.set_heading(heading)
+    else:
+        await confused(sphero)
     sphero.set_speed(0)
     sphero.set_main_led(BLACK)
 
 
+async def confused(sphero):
+    sphero.play_matrix_animation(get_animation_index("confused"), False)
+    sphero.spin(45, 0.5)
+    await asyncio.sleep(0.5)
+    sphero.spin(-90, 0.5)
+    await asyncio.sleep(0.5)
+    sphero.spin(45, 0.25)
+    await asyncio.sleep(0.25)
+
+
+async def happy(sphero, heading, do_well=True):
+    sphero.play_matrix_animation(get_animation_index("happy"), False)
+    await asyncio.sleep(2)
+
+
 def register_animations(sphero):
-    sphero.register_matrix_animation(
-        frames=[
-            numpy.rot90(
-                [
-                    [1, 1, 5, 1, 5, 1, 5, 1],
-                    [1, 1, 5, 5, 5, 5, 5, 5],
-                    [5, 1, 5, 5, 5, 5, 5, 5],
-                    [5, 5, 5, 5, 5, 5, 5, 5],
-                    [5, 5, 5, 5, 5, 5, 5, 5],
-                    [1, 5, 5, 5, 5, 5, 5, 5],
-                    [1, 1, 5, 5, 5, 5, 5, 1],
-                    [1, 1, 1, 5, 5, 5, 1, 1],
-                ]
-            )
-        ],
-        palette=[
-            Color(255, 255, 255),
-            Color(0, 0, 0),
-            Color(255, 0, 0),
-            Color(255, 64, 0),
-            Color(255, 128, 0),
-            Color(255, 191, 0),
-            Color(255, 255, 0),
-            Color(185, 246, 30),
-            Color(0, 255, 0),
-            Color(185, 255, 255),
-            Color(0, 255, 255),
-            Color(0, 0, 255),
-            Color(145, 0, 211),
-            Color(157, 48, 118),
-            Color(255, 0, 255),
-            Color(204, 27, 126),
-        ],
-        fps=10,
-        transition=0,
-    )
+    for _id, anim in ANIMATIONS:
+        sphero.register_matrix_animation(
+            frames=anim["frames"],
+            palette=anim["palette"],
+            fps=anim["fps"],
+            transition=anim["transition"],
+        )
 
 
 async def sphero_behavior(toy, command_queue, affect_queue):
-    global initialized
+    global initialized, last_command
     with SpheroEduAPI(toy) as sphero:
         sphero.set_main_led(BLACK)
         sphero.set_front_led(GREEN)
@@ -86,10 +92,22 @@ async def sphero_behavior(toy, command_queue, affect_queue):
             except asyncio.QueueEmpty:
                 command = None
 
+            try:
+                emotion = affect_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                emotion = None
+
+            if emotion:
+                update_emotion_buffer(emotion)
+
             if command:
+                if command == "try again":
+                    command = last_command
+                last_command = command
                 sphero.set_speed(0)
                 await asyncio.sleep(1)
-                await COMMAND_MAP[command](sphero)
+                await COMMAND_MAP[command](sphero, 0, do_well=random.randint(0, 10) > 5)
+                # TODO: look for emotion response
             else:
                 await asyncio.sleep(0.2)
 
@@ -162,8 +180,8 @@ async def unimplemented(sphero):
     print("in unimplemented")
 
 
-COMMANDS = ["hello", "fist bump", "play a game"]
-RESPONSES = [unimplemented, fist_bump, unimplemented]
+COMMANDS = ["fist bump", "play catch", "jump", "try again"]
+RESPONSES = [fist_bump, unimplemented, unimplemented]
 COMMAND_MAP = {command: response for command, response in zip(COMMANDS, RESPONSES)}
 
 
@@ -173,7 +191,7 @@ async def main(sphero):
     affect_queue = asyncio.Queue()
 
     tasks = [
-        # asyncio.create_task(watch_wrapper(loop, affect_queue)),
+        asyncio.create_task(watch_wrapper(loop, affect_queue)),
         asyncio.create_task(sphero_behavior(sphero, command_queue, affect_queue)),
         asyncio.create_task(listen_wrapper(loop, command_queue)),
     ]
