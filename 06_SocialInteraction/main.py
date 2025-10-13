@@ -17,9 +17,11 @@ from animations import ANIMATIONS, get_animation_index
 GREEN = Color(20, 250, 25)
 BLACK = Color(0, 0, 0)
 MAX_EMOTION_BUFFER_LENGTH = 10
+NEGATIVE_EMOTIONS = ("sad", "surprised", "angry", "fear", "neutral")
 
 initialized = False
 last_command = None
+current_num_failures = 0
 emotion_buffer = []
 
 
@@ -32,6 +34,7 @@ def update_emotion_buffer(new_emotion):
 
 
 def get_primary_emotion():
+    # little bit of hysteresis because deepface isn't that consistent in its evaluation
     return max(emotion_buffer, key=emotion_buffer.count)
 
 
@@ -60,7 +63,7 @@ async def confused(sphero):
     await asyncio.sleep(0.25)
 
 
-async def happy(sphero, heading, do_well=True):
+async def happy(sphero):
     sphero.play_matrix_animation(get_animation_index("happy"), False)
     await asyncio.sleep(2)
 
@@ -75,6 +78,33 @@ def register_animations(sphero):
         )
 
 
+async def execute_command(sphero, command):
+    global current_num_failures
+    if command:
+        sphero.set_speed(0)
+        await asyncio.sleep(1)
+        chance_of_good_behavior = 10 - current_num_failures
+        will_do_well = random.randint(0, chance_of_good_behavior) > 5
+        await COMMAND_MAP[command](sphero, 0, will_do_well)
+
+        await asyncio.sleep(2)
+        human_response = get_primary_emotion()
+        print("human response", human_response)
+        print("emotion buffer", emotion_buffer)
+        if human_response in ("happy"):
+            await happy(sphero)
+            current_num_failures = 0
+
+        elif human_response in NEGATIVE_EMOTIONS:
+            while human_response in NEGATIVE_EMOTIONS:
+                current_num_failures += 1
+                await execute_command(sphero, command)
+                await asyncio.sleep(2)
+
+        else:
+            await asyncio.sleep(0.2)
+
+
 async def sphero_behavior(toy, command_queue, affect_queue):
     global initialized, last_command
     with SpheroEduAPI(toy) as sphero:
@@ -82,7 +112,6 @@ async def sphero_behavior(toy, command_queue, affect_queue):
         sphero.set_front_led(GREEN)
 
         if not initialized:
-            # await calibrate(sphero)
             register_animations(sphero)
             initialized = True
 
@@ -91,7 +120,6 @@ async def sphero_behavior(toy, command_queue, affect_queue):
                 command = command_queue.get_nowait()
             except asyncio.QueueEmpty:
                 command = None
-
             try:
                 emotion = affect_queue.get_nowait()
             except asyncio.QueueEmpty:
@@ -99,17 +127,9 @@ async def sphero_behavior(toy, command_queue, affect_queue):
 
             if emotion:
                 update_emotion_buffer(emotion)
-
             if command:
-                if command == "try again":
-                    command = last_command
-                last_command = command
-                sphero.set_speed(0)
-                await asyncio.sleep(1)
-                await COMMAND_MAP[command](sphero, 0, do_well=random.randint(0, 10) > 5)
-                # TODO: look for emotion response
-            else:
-                await asyncio.sleep(0.2)
+                await execute_command(sphero, command)
+            await asyncio.sleep(0.2)
 
 
 def watch(video_stream):
@@ -166,7 +186,6 @@ def listen():
 async def listen_wrapper(loop, command_queue):
     while True:
         text = await loop.run_in_executor(None, listen)
-        print("got text", text)
         if not text:
             continue
         for command in COMMANDS:
@@ -181,7 +200,7 @@ async def unimplemented(sphero):
 
 
 COMMANDS = ["fist bump", "play catch", "jump", "try again"]
-RESPONSES = [fist_bump, unimplemented, unimplemented]
+RESPONSES = [fist_bump, unimplemented, unimplemented, unimplemented]
 COMMAND_MAP = {command: response for command, response in zip(COMMANDS, RESPONSES)}
 
 
@@ -192,8 +211,8 @@ async def main(sphero):
 
     tasks = [
         asyncio.create_task(watch_wrapper(loop, affect_queue)),
-        asyncio.create_task(sphero_behavior(sphero, command_queue, affect_queue)),
         asyncio.create_task(listen_wrapper(loop, command_queue)),
+        asyncio.create_task(sphero_behavior(sphero, command_queue, affect_queue)),
     ]
     try:
         # Run until one of the tasks fails or is cancelled
