@@ -66,8 +66,51 @@ async def fist_bump(toy):
         sphero.set_main_led(BLACK)
 
 
+async def trick_spin(sphero):
+    sphero.spin(360, 0.5)
+    await asyncio.sleep(0.5)
+
+
+async def excited_yes(sphero):
+    sphero.set_speed(50)
+    sphero.spin(360, 1)
+    sphero.set_speed(0)
+
+
+async def play_catch(sphero):
+    await asyncio.sleep(1)
+    # First leg
+    sphero.spin(180, 0.5)
+    await asyncio.sleep(0.5)
+    sphero.set_speed(25)
+    await asyncio.sleep(0.75)
+    sphero.set_speed(0)
+    # Turn back and check in
+    sphero.spin(-180, 0.5)
+    await asyncio.sleep(3)
+    sphero.spin(180, 0.5)
+    await asyncio.sleep(0.5)
+    sphero.set_speed(25)
+    await asyncio.sleep(0.5)
+    sphero.set_speed(0)
+    sphero.spin(180, 0.5)
+    await asyncio.sleep(3)
+    sphero.spin(90, 0.25)
+    await asyncio.sleep(0.4)
+    sphero.set_speed(25)
+    await asyncio.sleep(0.4)
+    sphero.set_speed(0)
+    sphero.spin(-90, 0.25)
+    await asyncio.sleep(4)
+    sphero.set_speed(150)
+    await asyncio.sleep(2)
+    sphero.set_speed(0)
+
+
 async def main(sphero):
-    await fist_bump(sphero)
+    # await fist_bump(sphero)
+    with SpheroEduAPI(toy) as sphero:
+        await play_catch(sphero)
 
 
 if __name__ == "__main__":
