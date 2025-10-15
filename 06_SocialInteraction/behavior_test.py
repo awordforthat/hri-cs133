@@ -91,17 +91,22 @@ async def play_catch(sphero):
     sphero.spin(180, 0.5)
     await asyncio.sleep(0.5)
     sphero.set_speed(25)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.6)
     sphero.set_speed(0)
+    # Second leg
     sphero.spin(180, 0.5)
     await asyncio.sleep(3)
+    # Nudge left
     sphero.spin(90, 0.25)
     await asyncio.sleep(0.4)
     sphero.set_speed(25)
     await asyncio.sleep(0.4)
     sphero.set_speed(0)
+    # Turn back to start
     sphero.spin(-90, 0.25)
+    # Wait
     await asyncio.sleep(4)
+    # Yeet
     sphero.set_speed(150)
     await asyncio.sleep(2)
     sphero.set_speed(0)
