@@ -81,7 +81,7 @@ async def say_no(sphero, args):
     sphero.spin(-2 * offset, 0.15)
     sphero.spin(2 * offset, 0.15)
     sphero.spin(-offset, 0.15)
-    sphero.set_front_led(BLUE)
+    sphero.set_front_led(TEAL)
 
 
 async def say_yes(sphero, args):
@@ -180,12 +180,16 @@ async def sphero_behavior(toy, command_queue, affect_queue):
                 except asyncio.QueueEmpty:
                     emotion = None
                 print(emotion)
-                if emotion in NEGATIVE_EMOTIONS:
+                if emotion in NEGATIVE_EMOTIONS and current_phase == DemoPhases.START:
                     await approach(sphero)
                     current_phase = DemoPhases.MID
+                elif emotion in POSITIVE_EMOTIONS and current_phase == DemoPhases.END:
+                    sphero.play_matrix_animation(get_animation_index("happy"), False)
 
             if command:
                 await execute_command(sphero, command)
+                if command == "fastball":
+                    current_phase = DemoPhases.END
 
             await asyncio.sleep(0.2)
 
