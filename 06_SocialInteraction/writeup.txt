@@ -1,0 +1,32 @@
+This interaction is a lightweight imitation of playing with a robotic pet. The steps are as follows:
+
+1. Sphero detects a sad expression and approaches with a "??" animation
+2. A back-and-forth happens where I ask Sphero what it wants to do. Sphero says no to the first two options.
+3. After hearing the option "tricks", Sphero indicates that it wants to do this by spinning in a circle.
+4. I prompt for three tricks: spin, fist bump and fastball special.
+5. In the fastball trick, I position Sphero using gestures.
+6. Sphero launches itself at me and I catch it. 
+7. When I have a happy expression on my face, Sphero plays a happy face animation to match.
+
+Incorporation of the required elements:
+- Pointing happens in step 5, where I point at the place Sphero is supposed to go
+- Joint attention also happens in 5, where we're looking at the location Sphero should launch from
+- Turn taking kind of happens throughout, although it's most obvious in the yes/no responses in steps 1 and 2
+- I used the front LED to indicate where Sphero is looking. During step 5, Sphero looks between me and the target location. 
+- I used gestures throughout, and Sphero used two gestures: fist bump and indicating "no"
+- Touch is unused, although I would have used the freefall event if it worked properly in the open source library.
+- I had Sphero play with proxemics in 5, where it launched itself off the table at me. It goes from a conversational position to a playful/unconventional approach and landing spot.
+- Social navigation is minimal, but expressed in step 1 when Sphero approaches at the point where I look sad.
+- Facial expressions are auto-detected using Deepface in step 1 and step 7. 
+
+Timing is so critical in actually animating these interactions and it's really hard to get right. Especially with the "shaking head no" animation, I was having trouble getting the animation fast enough. The motors just aren't responsive enough for me to get the vibe I was going for (something like "opinionated toddler"). 
+
+If I had more time, I would have made the pace of the conversation faster and more programmatic. As it is, I controlled the timing of the conversation by the speed of my responses. The speed of Sphero's responses were mostly dictated by how fast I could get output from the speech recognition library. The other struggle was getting fast/accurate responses from Deepface. It mostly thought I looked fearful, neutral, or sad all the time, so prompting step 7 with a happy expression took longer than I wanted it to. 
+
+Disclaimers/Notes:
+- I used Deepface for recognizing expressions
+- I used the SpeechRecognition library for verbal commands (program structure developed from the week 4 assignment)
+- I wanted to record my laptop camera at the same time and stitch the two videos together, but Windows prevents two programs from accessing the stream at the same time. I'm happy to demo this at any time to prove that it works.
+- It's hard to see in the video but there are some animations playing on the robot in steps 1, 3, 4 and 7.
+- I modified the spherov2 library so I could get the fist bump animation right. The library resets the robot's heading to 0deg after every stop_roll and stop_spin command, which meant that I couldn't get the smooth forward-back fist bump behavior I wanted. If you try this with the out-of-the-box library from PyPI it's not going to match the video.
+- I used AI to help me fight through a whole bunch of Python dependency incompatibilities.

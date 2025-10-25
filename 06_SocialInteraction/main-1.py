@@ -273,7 +273,7 @@ async def main(sphero):
         asyncio.create_task(sphero_behavior(sphero, command_queue, affect_queue)),
     ]
     try:
-        # Run until one of the tasks fails or is cancelled.
+        # Run until one of the tasks fails or is cancelled
         await asyncio.gather(*tasks)
     except asyncio.CancelledError:
         print("Main cancelled, shutting down...")
