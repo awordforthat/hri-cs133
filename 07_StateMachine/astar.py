@@ -1,13 +1,5 @@
 import math
 
-grid = [
-    [0, 0, 0, 0, 0],
-    [0, 1, 1, 0, 0],
-    [0, 0, 0, 1, 0],
-    [0, 1, 0, 0, 0],
-    [0, 0, 0, 1, 0],
-]
-
 
 def heuristic(start, goal, strategy):
     match strategy:
@@ -30,7 +22,6 @@ def reconstruct_path(came_from, current):
 
 def get_neighbors(node, grid):
     neighbors = []
-
     is_at_left_edge = node[0] == 0
     is_at_right_edge = node[0] == len(grid[0]) - 1
     is_at_top_edge = node[1] == 0
@@ -60,7 +51,7 @@ def distance(a, b, strategy):
     return heuristic(a, b, strategy)
 
 
-def a_star(start, goal, strategy="manhattan"):
+def a_star(start, goal, grid, strategy="manhattan"):
     open_nodes = [start]  # priority queue ordered by min_f
     closed_nodes = []
 
@@ -96,7 +87,3 @@ def a_star(start, goal, strategy="manhattan"):
                 if neighbor not in open_nodes:
                     open_nodes.append(neighbor)
     return False
-
-
-print(a_star((0, 0), (4, 4), "manhattan"))
-print(a_star((0, 0), (4, 4), "euclidian"))

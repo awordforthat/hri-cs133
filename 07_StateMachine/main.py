@@ -4,13 +4,16 @@ from spherov2 import scanner
 from spherov2 import toy
 from spherov2.sphero_edu import SpheroEduAPI
 
-from states import Initial, StateName, Terminal, Traveling
+from states import Caught, Chasing, Evading, Initial, StateName, Terminal, TimedOut
 
 
 async def main(sphero):
     states = {
         StateName.INITIAL: Initial(sphero, StateName.INITIAL),
-        StateName.TRAVELING: Traveling(sphero, StateName.TRAVELING),
+        StateName.EVADING: Evading(sphero, StateName.EVADING),
+        StateName.CHASING: Chasing(sphero, StateName.CHASING),
+        StateName.CAUGHT: Caught(sphero, StateName.CAUGHT),
+        StateName.TIMED_OUT: TimedOut(sphero, StateName.TIMED_OUT),
         StateName.TERMINAL: Terminal(sphero, StateName.TERMINAL),
     }
 
@@ -32,6 +35,6 @@ if __name__ == "__main__":
     toy = scanner.find_toy(toy_name="SB-F11F")
     with SpheroEduAPI(toy) as sphero:
         try:
-            asyncio.run(main(toy))
+            asyncio.run(main(sphero))
         except KeyboardInterrupt:
             print("KeyboardInterrupt received, exiting...")
