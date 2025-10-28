@@ -44,7 +44,7 @@ def get_neighbors(node, grid):
     if not is_at_bottom_edge:  # south
         neighbors.append((node[0], node[1] + 1))
 
-    return list(filter(lambda node: grid[node[0]][node[1]] == 0, neighbors))
+    return list(filter(lambda node: grid[node[1]][node[0]] == 0, neighbors))
 
 
 def distance(a, b, strategy):

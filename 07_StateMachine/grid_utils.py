@@ -26,25 +26,33 @@ def get_heading(start, end):
         return None
     x = end[0] - start[0]
     y = end[1] - start[1]
-
     # gross
     if x == 0:
         if y < 0:
-            return 270
-        return 90
+            return 0
+        return 180
 
     if y == 0:
         if x < 0:
-            return 180
-        return 0
+            return -90
+        return 90
 
-    return math.degrees(math.tan(y / x))
+    degrees = math.degrees(math.atan(y / x))
+
+    if x >= 0 and y >= 0:
+        return degrees + 90
+    if x <= 0 and y >= 0:
+        return degrees - 90
+    if x <= 0 and y <= 0:
+        return degrees - 90
+    if x >= 0 and y <= 0:
+        return degrees + 90
 
 
-async def follow_path(sphero, start, path):
-    current_location = start
+async def follow_path(sphero, path):
+    current_location = path[0]
     step_num = 0
-    while step_num < len(path) - 1:
+    while step_num < len(path):
         direction = get_heading(current_location, path[step_num])
         if direction is None:
             step_num += 1
@@ -52,6 +60,12 @@ async def follow_path(sphero, start, path):
         sphero.set_heading(
             int(direction)  # sphero drive code chokes on floats, cast to int instead.
         )
-        sphero.set_speed(100)
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.1)
+        dist = math.dist(current_location, path[step_num])
+        sleep_duration = 0.62 if dist == 1 else 0.8
+        sphero.set_speed(75)
+        await asyncio.sleep(sleep_duration if step_num <= 1 else sleep_duration * 0.55)
+        sphero.set_speed(0)
+        current_location = path[step_num]
         step_num += 1
+        await asyncio.sleep(0.1)

@@ -3,6 +3,7 @@
 04_MiniStudy/venv
 06_SocialInteraction/venv 
 06a_InClassMapActivity/venv
+07_StateMachine/venv
 
 *.mp4
 *.exe
