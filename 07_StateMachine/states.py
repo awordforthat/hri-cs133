@@ -64,7 +64,6 @@ class Initial(State):
 class Choosing(State):
     def __init__(self, sphero, name):
         super().__init__(sphero, name)
-        self.next_state = None
         self.yaw_buffer = deque(
             maxlen=5
         )  # assuming a polling rate of 10Hz, half a second of data
