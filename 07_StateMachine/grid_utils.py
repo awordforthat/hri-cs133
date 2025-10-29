@@ -11,13 +11,10 @@ def get_random_destination(grid, current_location):
     num_rows = len(grid)
     num_cols = len(grid[0])
     while result is None:
-        random_row = random.randint(0, num_rows - 1)
-        random_col = random.randint(0, num_cols - 1)
-        if (
-            not grid[random_row][random_col]
-            and (random_row, random_col) != current_location
-        ):
-            result = (random_row, random_col)
+        random_y = random.randint(0, num_rows - 1)
+        random_x = random.randint(0, num_cols - 1)
+        if not grid[random_y][random_x] and (random_y, random_x) != current_location:
+            result = (random_x, random_y)
     return result
 
 
@@ -69,3 +66,4 @@ async def follow_path(sphero, path):
         current_location = path[step_num]
         step_num += 1
         await asyncio.sleep(0.1)
+    await asyncio.sleep(2)

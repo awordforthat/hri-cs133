@@ -3,6 +3,7 @@ from collections import deque
 from datetime import datetime
 from enum import Enum
 import functools
+import random
 from statistics import mean
 
 from spherov2.sphero_edu import EventType
@@ -27,6 +28,10 @@ class StateName(Enum):
 class EventKey(Enum):
     COLLISION = "collision"
     LANDED = "landed"
+
+
+global_position = (0, 0)
+lost = None
 
 
 class Initial(State):
@@ -68,19 +73,20 @@ class Choosing(State):
         self.sphero.set_stabilization(False)
 
     async def execute(self):
-        while not self.next_state:
+        next_state = None
+        while not next_state:
             gyro = self.sphero.get_gyroscope()
             self.yaw_buffer.append(gyro["z"])
             average = mean(self.yaw_buffer)
 
             # Spin clockwise for evading, counter clockwise for chasing
             if average < 0 and abs(average) > 100:
-                self.next_state = StateName.EVADING
+                next_state = StateName.EVADING
             if average > 0 and abs(average) > 100:
-                self.next_state = StateName.CHASING
+                next_state = StateName.CHASING
 
             await asyncio.sleep(0.1)
-        return self.next_state
+        return next_state
 
     async def stop(self):
         self.sphero.set_stabilization(True)
@@ -91,15 +97,17 @@ class Evading(State):
 
     def __init__(self, sphero, name):
         super().__init__(sphero, name)
-        self.current_location = (0, 0)
         self.tasks = []
         self.comms_queue = asyncio.Queue()
-        self.path_task = None
         self.light_baseline = 0
 
-    async def path_wrapper(self, path):
+    async def path_wrapper(self):
+        global global_position
         while self.running:
-            await follow_path(self.sphero, self.current_location, path)
+            dest = get_random_destination(GRID, global_position)
+            path = a_star(global_position, dest, GRID)
+            await follow_path(self.sphero, path)
+            global_position = path[-1]
 
     def check_light_sensor(self):
         return self.sphero.get_luminosity()["ambient_light"]
@@ -115,19 +123,19 @@ class Evading(State):
             await asyncio.sleep(0.2)
 
     async def start(self):
+        global global_position
+        print("entering EVADE")
+        self.sphero.set_heading(0)
         self.start_time = datetime.now()
         self.light_baseline = self.sphero.get_luminosity()["ambient_light"]
         self.running = True
         self.sphero.set_main_led(GREEN)
 
         light_task = asyncio.create_task(self.check_light_wrapper())
-
-        dest = get_random_destination(GRID, self.current_location)
-        path = a_star(self.current_location, dest, GRID)
-        self.path_task = asyncio.create_task(self.path_wrapper(path))
+        path_task = asyncio.create_task(self.path_wrapper())
 
         self.tasks.append(light_task)
-        self.tasks.append(self.path_task)
+        self.tasks.append(path_task)
 
     async def execute(self):
         try:
@@ -141,10 +149,11 @@ class Evading(State):
                         light_result = self.comms_queue.get_nowait()
                     except:
                         light_result = None
+                    if light_result is None:
+                        continue
                     if (
-                        light_result
-                        and light_result > self.light_baseline * 1.25
-                        or light_result < self.light_baseline * 0.5
+                        light_result > self.light_baseline * 1.25
+                        or light_result < self.light_baseline * 0.1
                     ):
                         return StateName.CAUGHT
                 else:
@@ -165,15 +174,19 @@ class Chasing(State):
 
     def __init__(self, sphero, name):
         super().__init__(sphero, name)
-        self.current_location = (0, 0)
         self.tasks = []
         self.comms_queue = asyncio.Queue()
-        self.path_task = None
         self.light_baseline = 0
 
-    async def path_wrapper(self, path):
+    async def path_wrapper(self):
+        global global_position
+
         while self.running:
-            await follow_path(self.sphero, self.current_location, path)
+            dest = get_random_destination(GRID, global_position)
+            path = a_star(global_position, dest, GRID)
+            print(dest, path)
+            await follow_path(self.sphero, path)
+            global_position = path[-1]
 
     def check_light_sensor(self):
         return self.sphero.get_luminosity()["ambient_light"]
@@ -183,46 +196,46 @@ class Chasing(State):
         while self.running:
             try:
                 light_result = await loop.run_in_executor(None, self.check_light_sensor)
-                print(light_result)
                 await self.comms_queue.put(light_result)
             except Exception as e:
                 print("check_light_wrapper error:", e)
             await asyncio.sleep(0.2)
 
     async def start(self):
-        print("entering CHASING")
+        global global_position
+        print("entering CHASING", global_position)
         self.start_time = datetime.now()
-        self.light_baseline = self.sphero.get_luminosity()["ambient_light"]
+        self.light_baseline = self.sphero.get_luminosity()["ambient_light"] or 0
         self.running = True
         self.sphero.set_main_led(RED)
 
         light_task = asyncio.create_task(self.check_light_wrapper())
-
-        dest = get_random_destination(GRID, self.current_location)
-        path = a_star(self.current_location, dest, GRID)
-        self.path_task = asyncio.create_task(self.path_wrapper(path))
+        path_task = asyncio.create_task(self.path_wrapper())
 
         self.tasks.append(light_task)
-        self.tasks.append(self.path_task)
+        self.tasks.append(path_task)
 
     async def execute(self):
+        global lost, global_position
         try:
             while self.running:
                 if (
                     datetime.now() - self.start_time
-                ).total_seconds() < Evading.duration:
+                ).total_seconds() < Chasing.duration:
                     await asyncio.sleep(0.1)
                     # nested try catch, gross
                     try:
                         light_result = self.comms_queue.get_nowait()
                     except:
                         light_result = None
+                    if light_result is None:
+                        continue
+
                     if (
-                        light_result
-                        and light_result > light_result * self.light_baseline * 1.25
-                        or light_result < self.light_baseline * 0.5
+                        light_result > light_result * self.light_baseline * 1.25
+                        or light_result < self.light_baseline * 0.1
                     ):
-                        print(light_result)
+                        lost = True
                         return StateName.TERMINAL  # lose condition
                 else:
                     return StateName.TIMED_OUT
@@ -271,14 +284,16 @@ class Caught(State):
             EventType.on_landing,
             functools.partial(self.on_event, loop, EventKey.LANDED),
         )
-        self.sphero.scroll_matrix_text("You caught me!", WHITE, 30, True)
-        await asyncio.sleep(2)
-        self.sphero.scroll_matrix_text(
-            "Tap to play again, toss to end game", WHITE, 30, True
-        )
-        await asyncio.sleep(4)
+        self.sphero.set_main_led(TEAL)
+        # self.sphero.scroll_matrix_text("You caught me!", WHITE, 30, True)
+        # await asyncio.sleep(2)
+        # self.sphero.scroll_matrix_text(
+        #     "Tap to play again, toss to end game", WHITE, 30, True
+        # )
+        # await asyncio.sleep(4)
 
     async def execute(self):
+        global lost
         signals = []
         try:
             signals = []
@@ -292,9 +307,10 @@ class Caught(State):
         # Collision events are noisy and landings are hard to trigger.
         # Dump the whole queue and sort through the results to prioritize landings.
         if EventKey.LANDED in signals:
+            lost = False
             return StateName.TERMINAL
         elif EventKey.COLLISION in signals:
-            return StateName.INITIAL
+            return StateName.CHOOSING
 
         await asyncio.sleep(0.1)
 
@@ -324,8 +340,6 @@ class TimedOut(State):
 
 
 class Terminal(State):
-    duration = 15
-
     def __init__(self, sphero, name):
         super().__init__(sphero, name)
         self.start_time = 0
@@ -334,8 +348,15 @@ class Terminal(State):
         self.start_time = datetime.now()
 
     async def execute(self):
-        if (datetime.now() - self.start_time).total_seconds() < Terminal.duration:
-            self.sphero.play_matrix_animation(0)
+        if lost is None:
+            self.sphero.set_main_led(WHITE)
+            print("Tie game! (how did you get here?)")
+        elif lost:
+            self.sphero.set_main_led(RED)
+            print("Loserrrrr")
+        else:
+            self.sphero.set_main_led(GREEN)
+            print("You win!")
 
     async def stop(self):
         pass

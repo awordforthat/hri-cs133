@@ -59,7 +59,7 @@ def a_star(start, goal, grid, strategy="manhattan"):
     g_score = {}
     for r, row in enumerate(grid):
         for c, _ in enumerate(row):
-            g_score[(r, c)] = math.inf
+            g_score[(c, r)] = math.inf
     g_score[start] = 0
 
     f_score = {}
