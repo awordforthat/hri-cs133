@@ -8,12 +8,12 @@ def get_random_destination(grid, current_location):
     Assumes a grid of NxM as a list of lists. Blockages are represented by 1's.
     """
     result = None
-    num_rows = len(grid)
-    num_cols = len(grid[0])
+    num_rows = len(grid) - 1
+    num_cols = len(grid[0]) - 1
     while result is None:
         random_y = random.randint(0, num_rows - 1)
         random_x = random.randint(0, num_cols - 1)
-        if not grid[random_y][random_x] and (random_y, random_x) != current_location:
+        if not grid[random_x][random_x] and (random_y, random_x) != current_location:
             result = (random_x, random_y)
     return result
 
@@ -49,6 +49,7 @@ def get_heading(start, end):
 async def follow_path(sphero, path):
     current_location = path[0]
     step_num = 0
+    print("target", path[-1])
     while step_num < len(path):
         direction = get_heading(current_location, path[step_num])
         if direction is None:
@@ -59,9 +60,16 @@ async def follow_path(sphero, path):
         )
         await asyncio.sleep(0.1)
         dist = math.dist(current_location, path[step_num])
-        sleep_duration = 0.62 if dist == 1 else 0.8
-        sphero.set_speed(75)
-        await asyncio.sleep(sleep_duration if step_num <= 1 else sleep_duration * 0.55)
+        # what magical numbers
+
+        first_step_speed = 0.62 if dist == 1 else 0.83  # account for diagonals
+        mid_step_speed = (
+            first_step_speed * 0.55
+        )  # sphero still has momentum from the last step, so we have to take the speed down
+
+        sphero.set_speed(80)
+
+        await asyncio.sleep(first_step_speed if step_num <= 1 else mid_step_speed)
         sphero.set_speed(0)
         current_location = path[step_num]
         step_num += 1

@@ -3,14 +3,13 @@ from collections import deque
 from datetime import datetime
 from enum import Enum
 import functools
-import random
 from statistics import mean
 
 from spherov2.sphero_edu import EventType
 from spherov2.sphero_edu import SpheroEduAPI
 
 from astar import a_star
-from constants import BLACK, GREEN, GRID, RED, TEAL, WHITE, YELLOW
+from constants import BLACK, GREEN, GRID, LIGHT_THRESHHOLD, RED, TEAL, WHITE, YELLOW
 from grid_utils import follow_path, get_random_destination
 from state import State
 
@@ -69,14 +68,30 @@ class Choosing(State):
         )  # assuming a polling rate of 10Hz, half a second of data
 
     async def start(self):
+        self.sphero.set_front_led(TEAL)  # necessary if we skip initial state
         self.sphero.set_stabilization(False)
 
     async def execute(self):
+
         next_state = None
         while not next_state:
+            orientation = self.sphero.get_orientation()
+            # wait for stability
+            stable_pos = 10
+            if (
+                orientation["pitch"] < -stable_pos
+                or orientation["pitch"] > stable_pos
+                or orientation["roll"] < -stable_pos
+                or orientation["roll"] > stable_pos
+            ):
+                await asyncio.sleep(0.2)
+                continue
             gyro = self.sphero.get_gyroscope()
             self.yaw_buffer.append(gyro["z"])
             average = mean(self.yaw_buffer)
+            if len(self.yaw_buffer) < 5:
+                await asyncio.sleep(0.2)
+                continue
 
             # Spin clockwise for evading, counter clockwise for chasing
             if average < 0 and abs(average) > 100:
@@ -89,6 +104,7 @@ class Choosing(State):
 
     async def stop(self):
         self.sphero.set_stabilization(True)
+        self.yaw_buffer.clear()
 
 
 class Evading(State):
@@ -98,7 +114,6 @@ class Evading(State):
         super().__init__(sphero, name)
         self.tasks = []
         self.comms_queue = asyncio.Queue()
-        self.light_baseline = 0
 
     async def path_wrapper(self):
         global global_position
@@ -126,7 +141,6 @@ class Evading(State):
         print("entering EVADE")
         self.sphero.set_heading(0)
         self.start_time = datetime.now()
-        self.light_baseline = self.sphero.get_luminosity()["ambient_light"]
         self.running = True
         self.sphero.set_main_led(GREEN)
 
@@ -150,10 +164,7 @@ class Evading(State):
                         light_result = None
                     if light_result is None:
                         continue
-                    if (
-                        light_result > self.light_baseline * 1.25
-                        or light_result < self.light_baseline * 0.1
-                    ):
+                    if light_result >= LIGHT_THRESHHOLD:
                         return StateName.CAUGHT
                 else:
                     return StateName.TIMED_OUT
@@ -175,15 +186,18 @@ class Chasing(State):
         super().__init__(sphero, name)
         self.tasks = []
         self.comms_queue = asyncio.Queue()
-        self.light_baseline = 0
 
     async def path_wrapper(self):
         global global_position
 
         while self.running:
-            dest = get_random_destination(GRID, global_position)
-            path = a_star(global_position, dest, GRID)
-            print(dest, path)
+            dest = None
+            path = None
+            # Some destinations might be unreachable. A* returns False in that case.
+            # Keep trying until we have a valid destination.
+            while not path:
+                dest = get_random_destination(GRID, global_position)
+                path = a_star(global_position, dest, GRID)
             await follow_path(self.sphero, path)
             global_position = path[-1]
 
@@ -195,6 +209,7 @@ class Chasing(State):
         while self.running:
             try:
                 light_result = await loop.run_in_executor(None, self.check_light_sensor)
+
                 await self.comms_queue.put(light_result)
             except Exception as e:
                 print("check_light_wrapper error:", e)
@@ -204,7 +219,6 @@ class Chasing(State):
         global global_position
         print("entering CHASING", global_position)
         self.start_time = datetime.now()
-        self.light_baseline = self.sphero.get_luminosity()["ambient_light"] or 0
         self.running = True
         self.sphero.set_main_led(RED)
 
@@ -230,10 +244,7 @@ class Chasing(State):
                     if light_result is None:
                         continue
 
-                    if (
-                        light_result > light_result * self.light_baseline * 1.25
-                        or light_result < self.light_baseline * 0.1
-                    ):
+                    if light_result >= LIGHT_THRESHHOLD:
                         lost = True
                         return StateName.TERMINAL  # lose condition
                 else:
@@ -283,13 +294,12 @@ class Caught(State):
             EventType.on_landing,
             functools.partial(self.on_event, loop, EventKey.LANDED),
         )
-        self.sphero.set_main_led(TEAL)
-        # self.sphero.scroll_matrix_text("You caught me!", WHITE, 30, True)
-        # await asyncio.sleep(2)
-        # self.sphero.scroll_matrix_text(
-        #     "Tap to play again, toss to end game", WHITE, 30, True
-        # )
-        # await asyncio.sleep(4)
+        self.sphero.scroll_matrix_text("You caught me!", WHITE, 30, True)
+        await asyncio.sleep(2)
+        self.sphero.scroll_matrix_text(
+            "Toss to play again, tap to end game", WHITE, 30, True
+        )
+        await asyncio.sleep(4)
 
     async def execute(self):
         global lost
@@ -306,10 +316,10 @@ class Caught(State):
         # Collision events are noisy and landings are hard to trigger.
         # Dump the whole queue and sort through the results to prioritize landings.
         if EventKey.LANDED in signals:
+            return StateName.CHOOSING
+        elif EventKey.COLLISION in signals:
             lost = False
             return StateName.TERMINAL
-        elif EventKey.COLLISION in signals:
-            return StateName.CHOOSING
 
         await asyncio.sleep(0.1)
 
@@ -322,20 +332,72 @@ class Caught(State):
 class TimedOut(State):
     def __init__(self, sphero, name):
         super().__init__(sphero, name)
+        self.comms_queue = asyncio.Queue()
+        self.tasks = []
+
+    def flush_queue(self):
+        while not self.comms_queue.empty():
+            self.comms_queue.get_nowait()
+
+    async def write_event(self, type):
+        await self.comms_queue.put(type)
+
+    def on_event(self, loop, type, _):
+        event_write_task = loop.create_task(self.write_event(type))
+        self.tasks.append(event_write_task)
 
     async def start(self):
-        print("entering TIMED OUT")
-        pass
+        print("entering TIMED_OUT")
+        self.flush_queue()
+        loop = asyncio.get_running_loop()
+        self.sphero.set_main_led(YELLOW)
+        await asyncio.sleep(1)
+
+        SpheroEduAPI.register_event(
+            self.sphero,
+            EventType.on_collision,
+            functools.partial(self.on_event, loop, EventKey.COLLISION),
+        )
+        SpheroEduAPI.register_event(
+            self.sphero,
+            EventType.on_landing,
+            functools.partial(self.on_event, loop, EventKey.LANDED),
+        )
+
+        self.sphero.spin(720, 2)
+        await asyncio.sleep(1)
+        self.sphero.scroll_matrix_text(
+            "Timed out! Toss to play again, tap to end game.", WHITE, 30, True
+        )
+        await asyncio.sleep(1)
 
     async def execute(self):
-        self.sphero.spin(720, 2)
-        await asyncio.sleep(2)
-        self.sphero.scroll_matrix_text("I got away!", WHITE, 30, True)
-        await asyncio.sleep(4)
-        return StateName.CHASING
+        global lost
+        # Collision events are noisy and landings are hard to trigger.
+        # Dump the whole queue and sort through the results to prioritize landings.
+        try:
+            signals = []
+            while not self.comms_queue.empty():
+                signal = self.comms_queue.get_nowait()
+                if signal:
+                    signals.append(signal)
+        except:
+            print("exception")
+
+        print(signals)
+        if EventKey.LANDED in signals:
+            return StateName.CHOOSING
+        elif EventKey.COLLISION in signals:
+            lost = False
+            return StateName.TERMINAL
+
+        await asyncio.sleep(0.1)
 
     async def stop(self):
         self.sphero.set_speed(0)
+        for task in self.tasks:
+            task.cancel()
+        self.flush_queue()
 
 
 class Terminal(State):

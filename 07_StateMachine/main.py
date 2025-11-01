@@ -27,7 +27,7 @@ async def main(sphero):
         StateName.TERMINAL: Terminal(sphero, StateName.TERMINAL),
     }
 
-    current_state = states[StateName.INITIAL]
+    current_state = states[StateName.CHOOSING]
     await current_state.start()
 
     while current_state.name != StateName.TERMINAL:

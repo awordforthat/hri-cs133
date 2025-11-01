@@ -1,0 +1,25 @@
+Hi Mavis!
+
+I spent approximately a million years on this assignment and it's still not quite what I want it to be. Please bear with me!
+
+I programmed the robot to play tag with me. The states and transitions are:
+
+0. Initial state - just announces the start of the game and moves directly to choosing. Not really a part of the state machine for the purposes of this assignment, just there for me to see that the program has started.
+1. Choosing state - The player picks whether they want to chase or be chased. The trigger for both is spinning the robot around its Z axis, so clockwise or counterclockwise. Clockwise means the player is "it" and counter-clockwise means the robot is "it".
+2. Evading state - The robot is trying to evade the player. It chooses a random, unblocked location on the grid and navigates there using the shortest path calculated with A*. If the player catches the robot by covering the light sensor, it moves to the Caught state. If the state times out without the robot being caught, it moves to the Timed Out state.
+3. Chasing state - The player is trying to evade the robot. The robot movement, sensor input, and time logic are the same as the Evading state, but if the player catches the robot, they lose and the game is over (terminal state). If the state times out, we move on to the Timed Out state.
+4. Timed Out state -  The robot spins and says "I got away!". If the player tosses the robot in the air, we transition to the Choosing state to play again. If the player hits the robot, the game is over and we transition to the terminal state (violence against robots is not condoned, but sensor options are limited).
+5. Caught state - The robot says "You caught me!". The rest is the same as the Timed Out state.
+6. Terminal state - If the player lost, the main LED turns red. If the player chose to end the game, the LED turns green.
+
+I really struggled with getting the pathing to work correctly in the real world. The algorithm is fine, but getting the robot to reliably reach its destination without some localization strategy was really difficult. I've included a video of the robot just navigating around obstacles on a small grid to show that the logic works. In the video of the state transitions, you'll see that it loses position really fast and starts crashing in to things. 
+
+Also it's kind of a lot of code, so here's an outline of some of the key pieces:
+
+- main.py - entry point. Responsible for running the state lifecycle. 
+- state.py - abstract base for the states in the machine. Each state has a start(), stop() and execute() method. They also have a name and a reference to the robot. start() and stop() are called once, and execute() can be called many times.
+- states.py - Implementation of the states. To trigger a transition, the state returns the name of the state it should transition to. Returning None means the state should continue (keep calling execute())
+
+Everything else should be pretty self-explanatory.
+
+Thank you!

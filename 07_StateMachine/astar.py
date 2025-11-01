@@ -43,7 +43,6 @@ def get_neighbors(node, grid):
         neighbors.append((node[0], node[1] - 1))
     if not is_at_bottom_edge:  # south
         neighbors.append((node[0], node[1] + 1))
-
     return list(filter(lambda node: grid[node[1]][node[0]] == 0, neighbors))
 
 
